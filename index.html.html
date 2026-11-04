@@ -1,0 +1,168 @@
+<title>Schrödinger's Crossword</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: lab-notebook sheet — title band, grid on the left, two clue columns on the right; stacks on phones. */
+:root{
+  --paper:#f7f4ec; --ink:#1d2230; --rule:#cfc9ba; --muted:#6b6a63;
+  --cell:#ffffff; --cell-sel:#ffe9a8; --cell-word:#fff6d6; --black:#1d2230;
+  --quantum:#5b3fb8; --quantum-soft:#e9e2ff; --wrong:#c0392b; --ok:#2f7d4f;
+  --display:"Bodoni Moda",Georgia,"Times New Roman",serif;
+  --body:"Source Serif 4",Georgia,serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --paper:#15171e; --ink:#ebe7dc; --rule:#3a3d4a; --muted:#9a9890;
+  --cell:#f1ede2; --cell-sel:#f5d76e; --cell-word:#d9d2b4; --black:#05060a;
+  --quantum:#b39cff; --quantum-soft:#2c2450; --wrong:#ff7b6b; --ok:#6fd49a; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --paper:#15171e; --ink:#ebe7dc; --rule:#3a3d4a; --muted:#9a9890;
+  --cell:#f1ede2; --cell-sel:#f5d76e; --cell-word:#d9d2b4; --black:#05060a;
+  --quantum:#b39cff; --quantum-soft:#2c2450; --wrong:#ff7b6b; --ok:#6fd49a; color-scheme:dark }
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;
+  padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{max-width:1120px;margin:0 auto 22px;border-bottom:1px solid var(--rule);padding-bottom:16px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(34px,6vw,58px);line-height:1.02;margin:6px 0 10px;text-wrap:balance}
+h1 .q{color:var(--quantum);font-style:italic;font-weight:500}
+.note{max-width:62ch;margin:0;color:var(--ink)}
+.note b{color:var(--quantum)}
+main{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:28px;align-items:start}
+@media (max-width:820px){main{grid-template-columns:minmax(0,1fr)}}
+.board{min-width:0;position:sticky;top:env(safe-area-inset-top,0px)}
+@media (max-width:820px){.board{position:static}}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+button{font-family:var(--mono);font-size:12px;letter-spacing:.04em;border:1px solid var(--ink);background:transparent;color:var(--ink);
+  padding:7px 11px;border-radius:3px;cursor:pointer}
+button:hover{background:var(--ink);color:var(--paper)}
+button:focus-visible,.cell:focus-visible{outline:2px solid var(--quantum);outline-offset:2px}
+#grid{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));grid-template-rows:repeat(11,minmax(0,1fr));gap:0;width:min(100%,520px);aspect-ratio:1;border:2px solid var(--black);background:var(--black);
+  user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.cell{position:relative;background:var(--cell);border:1px solid var(--rule);display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-weight:700;font-size:clamp(14px,3.4vw,24px);color:#1d2230;cursor:pointer;min-width:0;min-height:0;overflow:hidden;line-height:1}
+.cell.black{background:var(--black);border-color:var(--black);cursor:default}
+.cell.word{background:var(--cell-word)}
+.cell.sel{background:var(--cell-sel)}
+.cell .n{position:absolute;top:1px;left:2px;font-size:clamp(7px,1.6vw,10px);font-weight:500;line-height:1;color:#1d2230}
+.cell.qbit{box-shadow:inset 0 0 0 2px var(--quantum)}
+.cell.qbit::after{content:"";position:absolute;right:2px;bottom:2px;width:6px;height:6px;border-radius:50%;background:var(--quantum)}
+.cell.wrong{color:var(--wrong)}
+.cell.wrong::before{content:"";position:absolute;inset:0;background:linear-gradient(to top right,transparent 48%,var(--wrong) 48%,var(--wrong) 52%,transparent 52%);opacity:.6}
+.cell.revealed{color:var(--quantum)}
+.cell.qbit.both .v{display:flex;gap:2px;align-items:baseline}
+.cell .alt{font-size:.62em;color:var(--quantum);font-weight:500}
+.state{margin-top:12px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.state .ket{color:var(--quantum);font-weight:700;font-size:14px}
+.current{margin:10px 0 0;padding:10px 12px;border-left:3px solid var(--quantum);background:var(--quantum-soft);font-size:15px;min-height:44px}
+.current .lab{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:8px}
+.clues{min-width:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px 26px}
+.clues h2{font-family:var(--display);font-weight:500;font-size:22px;margin:0 0 8px;letter-spacing:.01em;border-bottom:1px solid var(--rule);padding-bottom:4px}
+.clues ol{list-style:none;margin:0;padding:0}
+.clues li{display:grid;grid-template-columns:30px 1fr;gap:6px;padding:4px 6px;border-radius:2px;cursor:pointer;font-size:15px;line-height:1.35}
+.clues li .num{font-family:var(--mono);font-size:12px;font-weight:700;padding-top:2px;text-align:right}
+.clues li.on{background:var(--quantum-soft)}
+.clues li.done{color:var(--muted)}
+.clues li .q{color:var(--quantum);font-family:var(--mono);font-size:10px;margin-left:4px;vertical-align:super}
+#kb{position:fixed;opacity:0;left:-9999px;top:0;width:1px;height:1px}
+.win{margin-top:14px;padding:14px 16px;border:1px solid var(--quantum);background:var(--quantum-soft);font-size:15px}
+.win h3{font-family:var(--display);margin:0 0 6px;font-size:22px;font-weight:500}
+footer{max-width:1120px;margin:34px auto 0;font-size:13px;color:var(--muted);border-top:1px solid var(--rule);padding-top:10px}
+@media (prefers-reduced-motion:no-preference){.cell{transition:background .12s}}
+</style>
+<header>
+  <div class="eyebrow">Thought-experiment crossword · 11 × 11 · three squares in superposition</div>
+  <h1>Schrödinger's <span class="q">Crossword</span></h1>
+  <p class="note">Three squares in this grid (marked with a violet dot) are in superposition: each one accepts <b>two different letters</b>, and both make a real word Across <em>and</em> Down. Collapse all three one way and, read in grid order, they spell what is inside. Collapse them the other way and they spell what it is inside of. Either answer is correct; the puzzle only checks that the state is consistent.</p>
+</header>
+<main>
+  <section class="board" aria-label="Puzzle grid">
+    <div class="toolbar">
+      <button id="bCheck" type="button">Check</button>
+      <button id="bRevealSq" type="button">Reveal square</button>
+      <button id="bRevealAll" type="button">Reveal all</button>
+      <button id="bClear" type="button">Clear</button>
+      <button id="bDir" type="button">Across ⇄ Down</button>
+    </div>
+    <div id="grid" role="grid" aria-label="Crossword"></div>
+    <div class="current" id="current"><span class="lab">Clue</span><span id="curText">Tap a square to begin.</span></div>
+    <div class="state" id="state"></div>
+    <div id="win" class="win" hidden></div>
+    <input id="kb" type="text" autocomplete="off" autocapitalize="characters" aria-label="Type letters here">
+  </section>
+  <section class="clues">
+    <div><h2>Across</h2><ol id="acrossList"></ol></div>
+    <div><h2>Down</h2><ol id="downList"></ol></div>
+  </section>
+</main>
+<footer>Progress is saved in this browser only. Ö is written O, as crosswords do. The three marked squares were verified by machine so that every combination of their two letters yields valid entries in both directions.</footer>
+<script>
+const PZ = {"rows": ["DEC#ISM#LSD", "OAR#TAE#APO", "GRE#SPLAYED", "ELEV##AGING", "###EMINENCE", "SCHRODINGER", "HEADBAND###", "ALBUS##ALEC", "REENTRY#ADO", "ORA#EYE#ONA", "NYS#RET#SAT"], "duals": {"0,2": ["C", "B"], "1,5": ["A", "O"], "10,10": ["T", "X"]}, "across": {"1": "Short word associated with a big ball", "4": "Doctrine that's all suffix", "7": "Albert Hofmann's \"problem child,\" initially", "10": "Scull, e.g.", "11": "Bo's opener, or tic-tac's closer", "12": "Prefix in \"apogee\"", "13": "Grad-school hurdle, for short", "14": "Spread out awkwardly, like a newborn foal's legs", "16": "Trail-map figure: Abbr.", "18": "What wine and Dorian Gray's portrait both do", "19": "Distinction; with \"grise,\" a power behind the throne", "22": "Physicist whose 1935 thought experiment powers this puzzle", "25": "Sweat stopper worn above the brow", "26": "Dumbledore's first name", "27": "Actor Baldwin", "31": "Hottest phase of a capsule's homecoming", "34": "Much ___ About Nothing", "35": "\"___ pro nobis\"", "36": "What an observer brings to a measurement", "37": "\"___ roll\" (streaking)", "38": "Albany's realm: Abbr.", "39": "Soak, as flax", "40": "Kind of score for a high-schooler"}, "down": {"1": "Venetian ruler, or a meme-coin Shiba Inu", "2": "Grey tea namesake", "3": "Plains nation, or the Prancing Pony's village", "4": "\"___ alive!\" (good news from inside the box)", "5": "Something soaked up, in a way", "6": "Pigment behind a tabby's stripes", "7": "___ down the law", "8": "Gerry ___, Wyoming trial lawyer known for his fringed jacket", "9": "Artful one in \"Oliver Twist\"", "15": "Hidden ___ (ulterior motive)", "17": "1916 battle on the Meuse", "20": "Capone, for one", "21": "Lupino of film noir", "22": "Rose of ___", "23": "Stalk in a Bloody Mary", "24": "___ corpus (writ that demands the body be produced)", "28": "Vientiane's country", "29": "Poet St. Vincent Millay", "30": "Lay it on", "32": "The Catcher in the ___", "33": "But still"}};
+const N = 11;
+const cells = [];           // {r,c,black,num,sol,alt,el,val}
+const acrossNum = {}, downNum = {};
+let sel = null, dir = 'A';
+const grid = document.getElementById('grid');
+function key(r,c){return r+','+c}
+function isW(r,c){return r>=0&&r<N&&c>=0&&c<N&&PZ.rows[r][c]!=='#'}
+// numbering
+let n=0;
+for(let r=0;r<N;r++){cells[r]=[];for(let c=0;c<N;c++){
+  const black=!isW(r,c); let num=null;
+  if(!black){const sa=!isW(r,c-1)&&isW(r,c+1), sd=!isW(r-1,c)&&isW(r+1,c); if(sa||sd){n++;num=n; if(sa)acrossNum[n]=[r,c]; if(sd)downNum[n]=[r,c];}}
+  const alt=PZ.duals[key(r,c)]||null;
+  cells[r][c]={r,c,black,num,sol:black?null:PZ.rows[r][c],alt:alt?alt[1]:null,val:'',el:null,wrong:false,rev:false};
+}}
+function wordCells(r,c,d){const out=[];let [dr,dc]=d==='A'?[0,1]:[1,0];let rr=r,cc=c;while(isW(rr-dr,cc-dc)){rr-=dr;cc-=dc}while(isW(rr,cc)){out.push(cells[rr][cc]);rr+=dr;cc+=dc}return out}
+function wordStart(r,c,d){return wordCells(r,c,d)[0]}
+// build grid
+for(let r=0;r<N;r++)for(let c=0;c<N;c++){const cl=cells[r][c];const el=document.createElement('div');el.className='cell'+(cl.black?' black':'');el.setAttribute('role','gridcell');
+  if(!cl.black){el.tabIndex=-1;if(cl.alt)el.classList.add('qbit');if(cl.num)el.innerHTML='<span class="n">'+cl.num+'</span>';el.insertAdjacentHTML('beforeend','<span class="v"></span>');
+    el.addEventListener('click',()=>{if(sel&&sel.r===r&&sel.c===c)dir=dir==='A'?'D':'A';select(r,c);focusKb();});}
+  cl.el=el;grid.appendChild(el);}
+// clues
+function buildClues(list,map,d){const ol=document.getElementById(list);Object.keys(map).map(Number).sort((a,b)=>a-b).forEach(num=>{const [r,c]=map[num];const li=document.createElement('li');li.dataset.num=num;li.dataset.dir=d;
+  const txt=(d==='A'?PZ.across:PZ.down)[num]; const hasQ=wordCells(r,c,d).some(x=>x.alt);
+  li.innerHTML='<span class="num">'+num+'</span><span>'+txt+(hasQ?'<span class="q" title="contains a superposition square">ψ</span>':'')+'</span>';
+  li.addEventListener('click',()=>{dir=d;select(r,c);focusKb();});ol.appendChild(li);});}
+buildClues('acrossList',acrossNum,'A');buildClues('downList',downNum,'D');
+function focusKb(){const kb=document.getElementById('kb');kb.value='';kb.focus({preventScroll:true});}
+function render(){for(const row of cells)for(const cl of row){if(cl.black)continue;cl.el.classList.remove('sel','word','wrong','revealed');
+  const v=cl.el.querySelector('.v');v.textContent=cl.val;if(cl.wrong)cl.el.classList.add('wrong');if(cl.rev)cl.el.classList.add('revealed');}
+  if(sel){for(const cl of wordCells(sel.r,sel.c,dir))cl.el.classList.add('word');sel.el.classList.add('sel');
+    const st=wordStart(sel.r,sel.c,dir);document.getElementById('curText').textContent=st.num+(dir==='A'?'A. ':'D. ')+(dir==='A'?PZ.across:PZ.down)[st.num].replace(/<[^>]+>/g,'');
+    document.querySelectorAll('.clues li').forEach(li=>li.classList.toggle('on',Number(li.dataset.num)===st.num&&li.dataset.dir===dir));
+    const on=document.querySelector('.clues li.on');if(on&&window.innerWidth>820)on.scrollIntoView({block:'nearest'});}
+  document.querySelectorAll('.clues li').forEach(li=>{const [r,c]=(li.dataset.dir==='A'?acrossNum:downNum)[li.dataset.num];li.classList.toggle('done',wordCells(r,c,li.dataset.dir).every(x=>x.val));});
+  renderState();save();}
+function qcells(){const out=[];for(const row of cells)for(const cl of row)if(cl.alt)out.push(cl);return out}
+function renderState(){const q=qcells();const vals=q.map(x=>x.val);const a=q.map(x=>x.sol).join(''),b=q.map(x=>x.alt).join('');
+  let s='';if(vals.every(v=>v)){const w=vals.join('');if(w===a||w===b)s='Collapsed to <span class="ket">|'+w+'⟩</span> — a consistent eigenstate.';else s='Mixed state <span class="ket">|'+w+'⟩</span> — the squares disagree about what is being measured.';}
+  else s='Superposition squares: <span class="ket">'+(vals.map(v=>v||'·').join(' '))+'</span> — state not yet collapsed.';
+  document.getElementById('state').innerHTML='<span>ψ</span><span>'+s+'</span>';
+  const win=document.getElementById('win');let all=true,ok=true;for(const row of cells)for(const cl of row){if(cl.black)continue;if(!cl.val)all=false;else if(!(cl.val===cl.sol||cl.val===cl.alt))ok=false;}
+  if(all&&ok){const w=vals.join('');win.hidden=false;win.innerHTML='<h3>Measured.</h3>Every entry checks out. Your three squares collapsed to <b>'+w+'</b>'+(w===a||w===b?' — the other eigenstate, <b>'+(w===a?b:a)+'</b>, was equally correct.':', a mixed state the physics would frown on, but every word is still a word.');}
+  else win.hidden=true;}
+function select(r,c){if(!isW(r,c))return;sel=cells[r][c];render();}
+function move(dr,dc){if(!sel)return;let r=sel.r+dr,c=sel.c+dc;while(r>=0&&r<N&&c>=0&&c<N&&!isW(r,c)){r+=dr;c+=dc}if(isW(r,c))select(r,c);}
+function advance(back){const w=wordCells(sel.r,sel.c,dir);const i=w.indexOf(sel);if(back){if(i>0)select(w[i-1].r,w[i-1].c);}else{let j=i+1;while(j<w.length&&w[j].val)j++;if(j<w.length)select(w[j].r,w[j].c);}}
+function setVal(ch){if(!sel)return;sel.val=ch;sel.wrong=false;render();}
+function check(){for(const row of cells)for(const cl of row){if(cl.black||!cl.val)continue;cl.wrong=!(cl.val===cl.sol||cl.val===cl.alt);}render();}
+function reveal(cl){cl.val=cl.sol;cl.wrong=false;cl.rev=true;}
+document.getElementById('bCheck').onclick=check;
+document.getElementById('bRevealSq').onclick=()=>{if(sel){reveal(sel);render();}};
+document.getElementById('bRevealAll').onclick=()=>{for(const row of cells)for(const cl of row)if(!cl.black)reveal(cl);render();};
+document.getElementById('bClear').onclick=()=>{for(const row of cells)for(const cl of row)if(!cl.black){cl.val='';cl.wrong=false;cl.rev=false;}render();};
+document.getElementById('bDir').onclick=()=>{dir=dir==='A'?'D':'A';render();focusKb();};
+const kb=document.getElementById('kb');
+kb.addEventListener('input',e=>{const t=kb.value.toUpperCase().replace(/[^A-Z]/g,'');kb.value='';if(!t||!sel)return;for(const ch of t){setVal(ch);advance(false);}});
+document.addEventListener('keydown',e=>{if(!sel)return;const k=e.key;
+  if(k==='ArrowLeft'){dir='A';move(0,-1);e.preventDefault()}else if(k==='ArrowRight'){dir='A';move(0,1);e.preventDefault()}
+  else if(k==='ArrowUp'){dir='D';move(-1,0);e.preventDefault()}else if(k==='ArrowDown'){dir='D';move(1,0);e.preventDefault()}
+  else if(k==='Backspace'){if(sel.val){setVal('')}else{advance(true);setVal('')}e.preventDefault()}
+  else if(k==='Delete'){setVal('');e.preventDefault()}else if(k===' '||k==='Tab'){dir=dir==='A'?'D':'A';render();e.preventDefault()}
+  else if(/^[a-zA-Z]$/.test(k)&&e.target!==kb){setVal(k.toUpperCase());advance(false);e.preventDefault()}});
+function save(){try{localStorage.setItem('schrodinger-xw',JSON.stringify(cells.flat().map(c=>c.val||'')));}catch(e){}}
+function load(){try{const v=JSON.parse(localStorage.getItem('schrodinger-xw')||'null');if(Array.isArray(v)&&v.length===N*N)cells.flat().forEach((c,i)=>{if(!c.black&&/^[A-Z]?$/.test(v[i]))c.val=v[i];});}catch(e){}}
+load();render();
+</script>
